@@ -39,10 +39,15 @@ pub enum NormalToken {
     #[regex("IS", priority = 4, ignore(case))]
     Is,
 
+    /// Início da cláusula `REDEFINES` (decisão D24): faz um item ocupar o
+    /// mesmo espaço de outro já declarado, em vez de um espaço novo.
+    #[regex("REDEFINES", priority = 4, ignore(case))]
+    Redefines,
+
     /// Palavras reservadas fora do escopo desta etapa (decisão D5, D18):
     /// reconhecidas para virarem erro de estrutura, e não erro léxico.
     #[regex(
-        "VALUE|USAGE|OCCURS|REDEFINES|FILLER",
+        "VALUE|USAGE|OCCURS|FILLER",
         |lex| lex.slice().to_owned(),
         priority = 4,
         ignore(case)

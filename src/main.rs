@@ -7,12 +7,14 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use teiu_cobol::lexer::{self, TokenKind};
+use teiu_cobol::parser;
+use teiu_cobol::symbols::SymbolKind;
 
 /// Código de saída para erro de uso ou de leitura do arquivo (decisão D9).
 /// É o mesmo código que o clap usa quando os argumentos são inválidos.
 const EXIT_USAGE_ERROR: u8 = 2;
 /// Código de saída quando o programa analisado tem erros (decisão D9).
-const EXIT_LEXICAL_ERRORS: u8 = 1;
+const EXIT_WITH_ERRORS: u8 = 1;
 
 /// Analisador léxico e sintático da seção de declarações de COBOL.
 #[derive(Parser)]
@@ -40,30 +42,58 @@ fn main() -> ExitCode {
         }
     };
 
-    let (tokens, errors) = lexer::lex(&source);
+    let (tokens, lex_errors) = lexer::lex(&source);
+    let (symbols, parse_errors) = parser::parse(&tokens);
 
     println!("=== tokens ===");
     println!("{:<6} {:<6} {:<22} lexema", "linha", "coluna", "token");
     for token in &tokens {
-        let (nome, lexema) = describe(&token.kind);
+        let (nome, lexema) = describe_token(&token.kind);
         println!("{:<6} {:<6} {nome:<22} {lexema}", token.line, token.col);
     }
 
-    if errors.is_empty() {
-        println!("\nnenhum erro léxico encontrado");
-        ExitCode::SUCCESS
-    } else {
-        println!("\n=== erros léxicos ===");
-        for erro in &errors {
-            println!("erro léxico [linha {}, coluna {}]: {}", erro.line, erro.col, erro.message);
-        }
-        ExitCode::from(EXIT_LEXICAL_ERRORS)
+    println!("\n=== tabela de símbolos ===");
+    println!(
+        "{:<6} {:<5} {:<28} {:<10} {:<12} {:<6} {:<20} redefines",
+        "linha", "nível", "nome", "categoria", "pic", "bytes", "pai"
+    );
+    for symbol in &symbols {
+        let (categoria, pic) = describe_symbol(symbol);
+        println!(
+            "{:<6} {:<5} {:<28} {categoria:<10} {pic:<12} {:<6} {:<20} {}",
+            symbol.line,
+            symbol.level,
+            symbol.name,
+            symbol.size_bytes,
+            symbol.parent.as_deref().unwrap_or("-"),
+            symbol.redefines.as_deref().unwrap_or("-")
+        );
     }
+
+    let total_erros = lex_errors.len() + parse_errors.len();
+    if total_erros == 0 {
+        println!("\nnenhum erro encontrado");
+        return ExitCode::SUCCESS;
+    }
+
+    println!("\n=== erros ===");
+    // Os dois tipos de erro são listados juntos, em ordem de linha, porque é
+    // assim que um usuário lê o arquivo de cima para baixo.
+    let mut erros: Vec<(usize, usize, &str, &str)> = lex_errors
+        .iter()
+        .map(|e| (e.line, e.col, "léxico", e.message.as_str()))
+        .chain(parse_errors.iter().map(|e| (e.line, e.col, "estrutura", e.message.as_str())))
+        .collect();
+    erros.sort_by_key(|(line, col, ..)| (*line, *col));
+    for (line, col, tipo, mensagem) in erros {
+        println!("erro de {tipo} [linha {line}, coluna {col}]: {mensagem}");
+    }
+    ExitCode::from(EXIT_WITH_ERRORS)
 }
 
 /// Nome do token (igual ao das variantes de `docs/especificacao.md`) e o
 /// lexema a exibir, quando houver um específico.
-fn describe(kind: &TokenKind) -> (&'static str, String) {
+fn describe_token(kind: &TokenKind) -> (&'static str, String) {
     match kind {
         TokenKind::Data => ("Data", "DATA".into()),
         TokenKind::Division => ("Division", "DIVISION".into()),
@@ -71,10 +101,23 @@ fn describe(kind: &TokenKind) -> (&'static str, String) {
         TokenKind::Section => ("Section", "SECTION".into()),
         TokenKind::Pic => ("Pic", "PIC".into()),
         TokenKind::Is => ("Is", "IS".into()),
+        TokenKind::Redefines => ("Redefines", "REDEFINES".into()),
         TokenKind::UnsupportedReserved(lexema) => ("UnsupportedReserved", lexema.clone()),
         TokenKind::Number(lexema) => ("Number", lexema.clone()),
         TokenKind::Name(lexema) => ("Name", lexema.clone()),
         TokenKind::Period => ("Period", ".".into()),
         TokenKind::PicString(lexema) => ("PicString", lexema.clone()),
     }
+}
+
+/// Nome da categoria (igual aos tipos do enunciado: char/int/float, mais
+/// group) e a cadeia PIC a exibir, quando houver uma.
+fn describe_symbol(symbol: &teiu_cobol::symbols::Symbol) -> (&'static str, String) {
+    let categoria = match symbol.kind {
+        SymbolKind::Group => "group",
+        SymbolKind::Char { .. } => "char",
+        SymbolKind::Int { .. } => "int",
+        SymbolKind::Float { .. } => "float",
+    };
+    (categoria, symbol.pic.clone().unwrap_or_else(|| "-".into()))
 }

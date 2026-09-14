@@ -27,9 +27,11 @@ cargo test
 ## Estrutura
 
 ```
-src/main.rs           linha de comando e impressão dos tokens/erros
+src/main.rs           linha de comando e impressão de tokens/símbolos/erros
 src/token.rs          tokens do logos (NormalToken e PicToken)
-src/lexer.rs          troca de modo, linha/coluna, diagnósticos e testes
+src/lexer.rs          troca de modo, linha/coluna, diagnósticos léxicos e testes
+src/parser.rs         gramática de declarações, hierarquia de níveis e testes
+src/symbols.rs        tabela de símbolos e leitura das cadeias PIC
 docs/                 especificação e decisões de projeto
 exemplos/validos/     programas que devem ser aceitos
 exemplos/invalidos/   programas com erros léxicos e de estrutura

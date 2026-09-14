@@ -28,6 +28,7 @@ pub enum TokenKind {
     Section,
     Pic,
     Is,
+    Redefines,
     UnsupportedReserved(String),
     Number(String),
     Name(String),
@@ -150,6 +151,7 @@ fn handle_normal_token(
         NormalToken::Section => TokenKind::Section,
         NormalToken::Pic => unreachable!("tratado antes de chamar esta função"),
         NormalToken::Is => TokenKind::Is,
+        NormalToken::Redefines => TokenKind::Redefines,
         NormalToken::UnsupportedReserved(bytes) => {
             TokenKind::UnsupportedReserved(to_text(&bytes))
         }
@@ -246,6 +248,7 @@ mod tests {
                 TokenKind::Section => ("Section", String::new()),
                 TokenKind::Pic => ("Pic", String::new()),
                 TokenKind::Is => ("Is", String::new()),
+                TokenKind::Redefines => ("Redefines", String::new()),
                 TokenKind::UnsupportedReserved(s) => ("UnsupportedReserved", s.clone()),
                 TokenKind::Number(s) => ("Number", s.clone()),
                 TokenKind::Name(s) => ("Name", s.clone()),

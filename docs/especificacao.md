@@ -3,8 +3,9 @@
 Trabalho do Grau A de Compiladores (Unisinos): analisador léxico e gramática da
 seção de declarações de COBOL.
 
-> Estado: **tokens fechados e léxico executável (F2)**. As seções marcadas com
-> *(F4)* são fechadas na fase correspondente.
+> Estado: **léxico e sintático executáveis, com tabela de símbolos (F2+F4)**.
+> Faltam o notebook do Colab, a lista de programas de teste e o relatório
+> (F3, F5, F6).
 
 ## 1. Escopo
 
@@ -20,6 +21,7 @@ declarações de variáveis da linguagem estilo C do enunciado.
 | termina em `;`          | termina em `.`                                      |
 | sem inicialização       | sem cláusula `VALUE`                                |
 | espaços ignorados       | espaços, tabulações, quebras de linha e comentários `*>` ignorados |
+| (sem equivalente direto) | `REDEFINES`: um item ocupando o espaço de outro já declarado (decisão D24) |
 
 Exemplo de programa válido:
 
@@ -30,10 +32,18 @@ WORKING-STORAGE SECTION.
 01 CLIENTE.
    05 NOME        PIC X(30).
    05 SALDO       PIC S9(7)V99.
+   05 CPF-CNPJ    PIC X(14).
+   05 CPF         REDEFINES CPF-CNPJ PIC 9(11).
+   05 CNPJ        REDEFINES CPF-CNPJ PIC 9(14).
 ```
 
+`REDEFINES` foi acrescentado ao escopo por pedido do usuário, para um caso de
+uso real do trabalho (documento CPF ou CNPJ no mesmo campo) — é a única
+cláusula desta etapa sem equivalente na linguagem estilo C do enunciado, por
+isso a seção 6 detalha a regra à parte.
+
 Fora do escopo desta etapa (reconhecidos e rejeitados com erro): `VALUE`,
-`USAGE`, `OCCURS`, `REDEFINES`, `FILLER` e os níveis 66 e 88.
+`USAGE`, `OCCURS`, `FILLER` e os níveis 66 e 88.
 
 ## 2. Norma de referência
 
@@ -149,7 +159,8 @@ As expressões regulares ignoram maiúsculas e minúsculas.
 | `Section` | `SECTION` | 4 | | | reservada |
 | `Pic` | `PIC\|PICTURE` | 4 | `PIC`, `PICTURE` | `PICTURES` | reservada; entra no modo PIC |
 | `Is` | `IS` | 4 | | | reservada |
-| `UnsupportedReserved` | `VALUE\|USAGE\|OCCURS\|REDEFINES\|FILLER` | 4 | `VALUE` | | reconhecida para gerar erro de estrutura (D5, D18) |
+| `Redefines` | `REDEFINES` | 4 | | | reservada (decisão D24) |
+| `UnsupportedReserved` | `VALUE\|USAGE\|OCCURS\|FILLER` | 4 | `VALUE` | | reconhecida para gerar erro de estrutura (D5, D18) |
 | `Number` | `[0-9]+(\.[0-9]+)?` | 3 | `01`, `77`, `10`, `3.5` | `3.`, `.5`, `1-2`, `3,5` | a faixa de nível é verificada pelo sintático (D13, D14) |
 | `Name` | `([0-9]+-+)*[0-9]*[A-Z]([A-Z0-9-]*[A-Z0-9])?` | 2 | `CONTADOR`, `WS-CLIENTE`, `2A-VIA`, `1-A`, `A--B` | `-CONTA`, `CONTA-`, `123`, `1-2`, `CONTA_DOR`, `CONTA@X` | no máximo 31 caracteres (D17) |
 | `Period` | `\.` | 2 | `.` | | |
@@ -205,6 +216,7 @@ resolve os três erros frequentes do enunciado:
 | `PICTURE 9(5).99.` | `Pic` `InvalidPicString(9(5).99)` `Period` |
 | `PIC X9 VALUE` | `Pic` `InvalidPicString(X9)` `UnsupportedReserved(VALUE)` |
 | `PIC .` | `Pic` `Period` |
+| `CPF REDEFINES CPF-CNPJ PIC 9(11).` | `Name(CPF)` `Redefines` `Name(CPF-CNPJ)` `Pic` `PicString(9(11))` `Period` |
 
 Verificação: as regex foram conferidas contra as colunas *Aceita* e *Rejeita*
 (44 casos), e a semântica de casamento mais longo, prioridade e modos foi simulada
@@ -228,23 +240,119 @@ Implementado em `src/lexer.rs` e coberto por testes automatizados
 O diagnóstico de `InvalidWord` testa as situações na ordem da tabela e informa a
 primeira que se aplica.
 
-## 5. Gramática das declarações *(F4)*
+## 5. Gramática das declarações
 
-Gramática em EBNF.
+Implementada em `src/parser.rs` por um analisador descendente recursivo
+(decisão D7): cada regra abaixo é uma função, que chama a próxima e verifica o
+token atual antes de consumi-lo.
 
-## 6. Regras de hierarquia de níveis *(F4)*
+```ebnf
+programa            = cabecalho , { entrada } ;
+cabecalho           = "DATA" , "DIVISION" , "." , "WORKING-STORAGE" , "SECTION" , "." ;
+entrada             = NIVEL , NOME , [ clausula_redefines ] , [ clausula_pic ] , "." ;
+clausula_redefines  = "REDEFINES" , NOME ;
+clausula_pic        = ( "PIC" | "PICTURE" ) , [ "IS" ] , CADEIA_PIC ;
+```
 
-Restrições dependentes de contexto, verificadas com uma pilha no analisador
-sintático.
+`NIVEL`, `NOME` e `CADEIA_PIC` são os tokens `Number`, `Name` e `PicString` da
+seção 4. Não há um `FIM` explícito na gramática: `programa` simplesmente
+termina quando os tokens acabam — o analisador lê `entrada` enquanto houver
+token, e para no fim do arquivo.
 
-## 7. Tabela de símbolos *(F4)*
+A gramática é LL(1): basta olhar o próximo token para saber qual regra usar.
+Em `entrada`, por exemplo, o primeiro token (`NIVEL`) já é suficiente, e dentro
+dela a presença ou não de `PIC`/`PICTURE` decide se `clausula_pic` é lida.
 
-Campos registrados para cada item declarado.
+## 6. Regras de hierarquia de níveis
 
-## 8. Erros *(F3 e F4)*
+A gramática da seção 5 não diz **quem é filho de quem** — dois `entrada`
+seguidos são sintaticamente iguais, sejam eles irmãos (`01` e `01`) ou pai e
+filho (`01` e `05`). Essa relação depende do valor dos níveis já vistos antes,
+o que é contexto, e não estrutura da frase — por isso é verificada à parte,
+depois que todas as entradas já foram lidas (decisão D23), com uma pilha:
 
-Formato das mensagens: `erro <tipo> [linha L, coluna C]: <descrição>`.
-Toda mensagem informa a linha.
+- Uma entrada nível `L` fecha (retira da pilha) todo item aberto de nível `≥ L`.
+- O pai da entrada é o que sobrar no topo da pilha depois disso; se a pilha
+  ficar vazia, a entrada não tem pai.
+- Um item **sem** `PIC` é empilhado (pode ganhar filhos); um item **com** `PIC`
+  não é (é elementar, não tem filhos).
+- Um item de nível `77` esvazia a pilha inteira antes (não pode ter pai) e
+  nunca é empilhado (não pode ter filhos) — é sempre uma entrada isolada.
+
+Com isso, as regras exigidas ficam assim:
+
+| Regra | Verificação | Mensagem quando falha |
+|-------|-------------|------------------------|
+| Nível 02-49 precisa de um grupo aberto de nível menor | pilha vazia depois de fechar os níveis `≥ L` | "nível NN de 'nome' precisa estar subordinado a um item de nível menor" |
+| Nível 77 não pode ter pai | garantido por esvaziar a pilha antes | (nunca falha: 77 nunca tem pai) |
+| Nível 77 não pode ter filhos | garantido por nunca empilhar um 77 | (a entrada seguinte simplesmente não o acha como pai) |
+| Item de grupo (sem PIC) precisa de ao menos um filho | ao final, todo item sem PIC que nunca virou pai de ninguém | "item 'nome' incompleto: faltou a cláusula PIC, e o item também não tem nenhum subordinado" |
+| Item de nível 77 sempre precisa de PIC | caso particular da regra anterior | "item 'nome' incompleto: o nível 77 sempre exige a cláusula PIC" |
+
+O nível `01` é o único caso em que a pilha vazia é esperada (ele sempre começa
+um registro novo), então a regra da primeira linha não se aplica a ele.
+
+### 6.1 A cláusula `REDEFINES`
+
+`REDEFINES` (decisão D24) não muda a hierarquia acima — o item que redefine
+continua um irmão comum, no lugar de virar filho de ninguém. O que ela muda é
+o **espaço ocupado**: em vez de reservar um espaço novo, o item passa a
+ocupar o mesmo espaço de outro já declarado. É assim que se modela um campo
+de tamanho variável, como um documento que pode ser CPF (11 dígitos) ou CNPJ
+(14 dígitos):
+
+```cobol
+05 CPF-CNPJ PIC X(14).
+05 CPF       REDEFINES CPF-CNPJ PIC 9(11).
+05 CNPJ      REDEFINES CPF-CNPJ PIC 9(14).
+```
+
+A verificação, feita depois da hierarquia (`check_redefines` em
+`src/parser.rs`), é:
+
+- O alvo (`CPF-CNPJ`) precisa existir e ser elementar (ter PIC) — nesta etapa,
+  `REDEFINES` só é aceito entre itens elementares, e não entre grupos.
+- O item que redefine também precisa ser elementar.
+- A entrada de `REDEFINES` precisa vir **logo depois** do alvo — ou logo
+  depois de **outra** entrada que já redefine o mesmo alvo. É essa segunda
+  parte da regra que permite `CPF` **e** `CNPJ` redefinirem os dois o mesmo
+  `CPF-CNPJ`, um depois do outro: `CNPJ` escreve `REDEFINES CPF-CNPJ`, e não
+  `REDEFINES CPF`, mesmo vindo logo depois de `CPF` no arquivo.
+- Os dois precisam estar no mesmo nível.
+
+Como os dois ocupam o mesmo espaço, o tamanho do grupo (`PESSOA`, no exemplo)
+conta esse espaço **uma vez só**, usando o maior tamanho entre o alvo e todas
+as suas redefinições (decisão D25): no exemplo, 14 bytes (de `CPF-CNPJ` ou de
+`CNPJ`, que empatam), e não 14+11+14.
+
+## 7. Tabela de símbolos
+
+Uma entrada por item declarado, na ordem em que aparece no programa
+(`src/symbols.rs`):
+
+| Campo | Descrição |
+|-------|-----------|
+| `name` | nome do item, como foi escrito |
+| `level` | nível COBOL (01-49 ou 77) |
+| `kind` | `Group`, `Char { len }`, `Int { signed, len }` ou `Float { signed, int_len, frac_len }` — a leitura da cadeia PIC (seção 4.3), já traduzida para os três tipos do enunciado |
+| `pic` | a cadeia PIC como foi escrita, ou nenhuma nos itens de grupo |
+| `size_bytes` | tamanho do item; num item elementar, a soma das posições do PIC (decisão D21); num grupo, a soma dos filhos diretos, calculada depois que a hierarquia da seção 6 é resolvida |
+| `parent` | nome do pai na hierarquia, ou nenhum no topo |
+| `redefines` | nome do item que este redefine (seção 6.1), ou nenhum |
+| `line` | linha onde o nível foi declarado |
+
+## 8. Erros
+
+Formato das mensagens: `erro de <tipo> [linha L, coluna C]: <descrição>`, com
+`<tipo>` sendo `léxico` (seção 4.6) ou `estrutura` (seções 5 e 6). Toda
+mensagem informa a linha; `main.rs` lista as duas listas juntas, ordenadas por
+linha, porque é assim que um usuário lê o arquivo de cima para baixo.
+
+O analisador sintático se recupera de um erro em modo pânico (decisão D22):
+ao encontrar um problema numa `entrada`, ele avança até o próximo `.` e
+continua a partir da entrada seguinte, em vez de parar no primeiro erro — é
+assim que o exemplo `01 A B PIC X.` gera só uma mensagem, e as declarações
+depois dele continuam sendo verificadas normalmente.
 
 ## 9. Registro de decisões
 
@@ -270,6 +378,11 @@ Toda mensagem informa a linha.
 | D18 | Palavras reservadas restritas às do subconjunto e às cláusulas fora do escopo | A lista completa da ISO tem centenas de palavras e o texto normativo não estava disponível (ver L1). |
 | D19 | Código em inglês, comentários e mensagens ao usuário em português; tokens com os mesmos nomes na especificação e no código | O código segue a convenção do ecossistema Rust; o relatório, a apresentação e as mensagens são para a disciplina. Nomes iguais permitem rastrear cada regra da especificação até o código. |
 | D20 | `src/token.rs` só define os dois `enum` do `logos` (`NormalToken`, `PicToken`); `src/lexer.rs` conduz a troca de modo com `Lexer::morph`, localiza linha/coluna e produz o `Token` público e as mensagens de erro | Separa o que é gerado pela macro do `logos` (tokens e regras) do que é escrito à mão (posição, diagnóstico, troca de modo), o que facilita mostrar cada trecho na apresentação. |
+| D21 | Tamanho de um item elementar é a soma das posições do PIC (`X`→1 byte, `9`→1 byte, sinal não conta byte à parte) | O enunciado não pede um formato de armazenamento específico; a leitura "de exibição" (um byte por posição) é a mais simples de explicar e testar. Formatos binários/empacotados ficam fora do escopo (seção 10, L6). |
+| D22 | Recuperação de erro em modo pânico: ao falhar numa `entrada`, o sintático avança até o próximo `.` e continua dali | É a técnica mais simples de recuperação de erro sintático e já resolve o requisito do enunciado de relatar mais de um erro por execução; outras técnicas (conjuntos de sincronização, correção automática) são desproporcionais ao tamanho da gramática. |
+| D23 | A hierarquia de níveis (seção 6) é verificada num segundo passo, depois que `src/parser.rs` já montou todos os símbolos, e não durante a leitura de cada `entrada` | O tamanho de um grupo depende dos filhos, que só se sabe todos depois de ler o programa inteiro; fazer isso num segundo passo, com uma pilha, evita calcular o tamanho de um grupo antes de conhecer todos os seus membros. |
+| D24 | `REDEFINES` entra no escopo (seção 6.1), restrito a itens elementares (com PIC) de ambos os lados; a entrada precisa vir logo depois do alvo ou de outra redefinição do mesmo alvo | Pedido do usuário, para um caso de uso real (documento CPF/CNPJ no mesmo campo). É a única cláusula fora da correspondência com a linguagem estilo C do enunciado. A restrição a elementares evita a complexidade de um grupo redefinir outro grupo (recalcular o tamanho de uma subárvore inteira), que fica como trabalho futuro (L9). A regra de adjacência (D22, no sentido de manter a leitura simples) é a mesma que a maioria dos compiladores COBOL exige. |
+| D25 | O tamanho de um grupo conta um item redefinido **uma vez só**, como o maior tamanho entre ele e todas as suas redefinições | `REDEFINES` significa que os itens dividem o mesmo espaço de memória, e não que cada um tem o seu; somar os dois contaria espaço em dobro. |
 
 ## 10. Limitações conhecidas
 
@@ -280,3 +393,7 @@ Toda mensagem informa a linha.
 | L3 | Coluna contada em bytes | Um caractere acentuado em comentário ocupa mais de uma coluna. Não afeta a linha. |
 | L4 | PIC editados (`Z`, `*`, `,`, `.` inserido) não são aceitos | `PIC 9(5).99` e `PIC ZZ9` geram erro de cadeia PIC. |
 | L5 | O comentário `*>` precisa começar um token | Em `PIC X.*> texto`, sem espaço antes do `*>`, a sequência `X.*>` vira `InvalidPicString`. |
+| L6 | Tamanho em bytes não representa formatos binários/empacotados (decisão D21) | `PIC S9(4) USAGE COMP` teria o mesmo tamanho calculado que sem `USAGE`, embora ocupe menos bytes de verdade — mas `USAGE` está fora do escopo (seção 1), então isso não afeta os programas aceitos nesta etapa. |
+| L7 | Nomes repetidos no mesmo programa não são detectados como erro | `01 A PIC X.` seguido de outro `01 A PIC X.` é aceito; o segundo sobrescreve o primeiro na verificação de hierarquia (seção 6), já que ela indexa por nome. |
+| L8 | Um item elementar (com PIC) que recebe um item de nível menor logo depois não é sinalizado como erro específico | Como um item com PIC nunca é empilhado (seção 6), o nível seguinte procura o pai mais acima e pode encontrar um grupo mais distante, em vez de acusar "item elementar não pode ter subordinados". |
+| L9 | `REDEFINES` só é aceito entre itens elementares (D24) | `05 GRUPO-B REDEFINES GRUPO-A.`, com os dois sendo grupos, não é aceito nesta etapa. |
