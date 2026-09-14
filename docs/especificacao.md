@@ -3,9 +3,8 @@
 Trabalho do Grau A de Compiladores (Unisinos): analisador léxico e gramática da
 seção de declarações de COBOL.
 
-> Estado: **léxico e sintático executáveis, com tabela de símbolos (F2+F4)**.
-> Faltam o notebook do Colab, a lista de programas de teste e o relatório
-> (F3, F5, F6).
+> Estado: **léxico e sintático executáveis, com tabela de símbolos e suíte de
+> testes (F2+F4+F5)**. Faltam o notebook do Colab e o relatório (F3, F6).
 
 ## 1. Escopo
 
