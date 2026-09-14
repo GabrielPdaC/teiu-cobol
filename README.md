@@ -8,7 +8,8 @@ A especificação dos tokens, a gramática e as decisões de projeto estão em
 
 ## Executar
 
-Requer Rust (stable, edição 2024). Não há dependências externas.
+Requer Rust (stable, edição 2024). As dependências e o motivo de cada uma estão
+na decisão D6 da especificação.
 
 ```sh
 cargo run -- exemplos/validos/01-cliente.cob
