@@ -18,11 +18,19 @@ cargo run -- exemplos/validos/01-cliente.cob
 Códigos de saída: `0` sem erros, `1` com erros no programa analisado,
 `2` erro de uso ou de leitura do arquivo.
 
+Para rodar os testes automatizados do analisador léxico:
+
+```sh
+cargo test
+```
+
 ## Estrutura
 
 ```
-src/                 código-fonte do analisador
-docs/                especificação e decisões de projeto
-exemplos/validos/    programas que devem ser aceitos
-exemplos/invalidos/  programas com erros léxicos e de estrutura
+src/main.rs           linha de comando e impressão dos tokens/erros
+src/token.rs          tokens do logos (NormalToken e PicToken)
+src/lexer.rs          troca de modo, linha/coluna, diagnósticos e testes
+docs/                 especificação e decisões de projeto
+exemplos/validos/     programas que devem ser aceitos
+exemplos/invalidos/   programas com erros léxicos e de estrutura
 ```

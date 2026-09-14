@@ -8,3 +8,4 @@ description = "Analisador léxico e sintático da seção de declarações de CO
 # Dependências justificadas na decisão D6 de docs/especificacao.md.
 [dependencies]
 clap = { version = "4.6", features = ["derive"] }
+logos = "0.16"

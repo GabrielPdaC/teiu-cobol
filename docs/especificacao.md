@@ -3,8 +3,8 @@
 Trabalho do Grau A de Compiladores (Unisinos): analisador léxico e gramática da
 seção de declarações de COBOL.
 
-> Estado: **rascunho dos tokens (F1)**. As seções marcadas com *(F2)* e *(F4)*
-> são fechadas na fase correspondente.
+> Estado: **tokens fechados e léxico executável (F2)**. As seções marcadas com
+> *(F4)* são fechadas na fase correspondente.
 
 ## 1. Escopo
 
@@ -211,9 +211,11 @@ Verificação: as regex foram conferidas contra as colunas *Aceita* e *Rejeita*
 sobre 21 entradas, incluindo as desta tabela. Nenhuma falhou. Na F2 esses casos
 viram testes unitários em Rust.
 
-### 4.6 Erros léxicos *(F2)*
+### 4.6 Erros léxicos
 
 Toda mensagem informa linha e coluna e é escrita em português (D19).
+Implementado em `src/lexer.rs` e coberto por testes automatizados
+(`cargo test`).
 
 | Token | Situação | Exemplo | Mensagem prevista |
 |-------|----------|---------|-------------------|
@@ -255,7 +257,7 @@ Toda mensagem informa a linha.
 | D5 | `VALUE` é erro de estrutura, e não erro léxico | `VALUE` é palavra reservada válida de COBOL; o que o enunciado proíbe nesta etapa é a construção (inicialização), não a palavra. |
 | D6 | Dependências: `logos` para gerar o analisador léxico e `clap` para a linha de comando; analisador sintático escrito à mão | O `logos` é o equivalente em Rust do Flex indicado no enunciado: regras com expressões regulares compiladas num autômato, casamento mais longo, prioridade (ordem das regras), *callbacks* (ações) e troca de modo (*start conditions*). Foi preferido ao `lrlex`, que aceita arquivos no formato `.l` mas não tem ações, o que impediria verificar o tamanho de nomes e diagnosticar palavras inválidas no próprio léxico. O `clap` gera a ajuda e a validação dos argumentos. |
 | D7 | Analisador sintático descendente recursivo | A gramática de declarações é LL(1); cada regra vira uma função. |
-| D8 | Fonte lido como bytes, e não como texto UTF-8 | O alfabeto é ASCII; um arquivo com acentos ou em Latin-1 gera erro léxico com número de linha, em vez de falhar na leitura. *A confirmar na F2: suporte do `logos` a entrada em bytes.* |
+| D8 | Fonte lido como bytes, e não como texto UTF-8 | O alfabeto é ASCII; um arquivo com acentos ou em Latin-1 gera erro léxico com número de linha, em vez de falhar na leitura. Confirmado na F2: `#[logos(utf8 = false)]` faz o `logos` operar sobre `&[u8]`. |
 | D9 | Códigos de saída: 0 sem erros, 1 com erros no programa, 2 erro de uso ou de leitura | Permite automatizar os testes e distinguir falha do programa analisado de falha da ferramenta. Coincide com o código que o `clap` usa para argumentos inválidos. |
 | D10 | Revisão ISO/IEC 1989:2014 | É a revisão mais recente com perfil de conformidade público (GnuCOBOL) para conferir as regras; a de 2023 não tem. |
 | D11 | Sublinhado não é aceito em nomes | Não foi possível confirmar na ISO; aceitar só por ser extensão da IBM contrariaria D3. |
@@ -267,6 +269,7 @@ Toda mensagem informa a linha.
 | D17 | Limite de 31 caracteres verificado no *callback* do token `Name`, e não na regex | Uma regex com limite de repetição ficaria ilegível; o *callback* (a ação do Flex) dá uma mensagem específica. |
 | D18 | Palavras reservadas restritas às do subconjunto e às cláusulas fora do escopo | A lista completa da ISO tem centenas de palavras e o texto normativo não estava disponível (ver L1). |
 | D19 | Código em inglês, comentários e mensagens ao usuário em português; tokens com os mesmos nomes na especificação e no código | O código segue a convenção do ecossistema Rust; o relatório, a apresentação e as mensagens são para a disciplina. Nomes iguais permitem rastrear cada regra da especificação até o código. |
+| D20 | `src/token.rs` só define os dois `enum` do `logos` (`NormalToken`, `PicToken`); `src/lexer.rs` conduz a troca de modo com `Lexer::morph`, localiza linha/coluna e produz o `Token` público e as mensagens de erro | Separa o que é gerado pela macro do `logos` (tokens e regras) do que é escrito à mão (posição, diagnóstico, troca de modo), o que facilita mostrar cada trecho na apresentação. |
 
 ## 10. Limitações conhecidas
 
