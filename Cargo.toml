@@ -5,5 +5,6 @@ edition = "2024"
 rust-version = "1.85"
 description = "Analisador léxico e sintático da seção de declarações de COBOL"
 
-# Sem dependências externas (decisão D6 em docs/especificacao.md).
+# Dependências justificadas na decisão D6 de docs/especificacao.md.
 [dependencies]
+clap = { version = "4.6", features = ["derive"] }

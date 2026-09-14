@@ -1,32 +1,41 @@
 //! teiu-cobol: analisador léxico e sintático da seção de declarações de COBOL.
-//!
-//! Uso: `teiu-cobol <arquivo.cob>`
 
-use std::env;
 use std::fs;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
+use clap::Parser;
+
 /// Código de saída para erro de uso ou de leitura do arquivo (decisão D9).
-const SAIDA_ERRO_DE_USO: u8 = 2;
+/// É o mesmo código que o clap usa quando os argumentos são inválidos.
+const EXIT_USAGE_ERROR: u8 = 2;
+
+/// Analisador léxico e sintático da seção de declarações de COBOL.
+#[derive(Parser)]
+#[command(version, about)]
+struct Cli {
+    /// Arquivo-fonte COBOL a ser analisado
+    source: PathBuf,
+}
 
 fn main() -> ExitCode {
-    let argumentos: Vec<String> = env::args().collect();
-
-    let Some(caminho) = argumentos.get(1) else {
-        eprintln!("uso: teiu-cobol <arquivo.cob>");
-        return ExitCode::from(SAIDA_ERRO_DE_USO);
-    };
+    // Em caso de argumento ausente ou inválido, o clap imprime a ajuda e
+    // encerra o programa com o código 2.
+    let cli = Cli::parse();
 
     // Lido como bytes, e não como String, para que um caractere fora do ASCII
     // vire erro léxico com número de linha em vez de falha de leitura (decisão D8).
-    let fonte: Vec<u8> = match fs::read(caminho) {
+    let source: Vec<u8> = match fs::read(&cli.source) {
         Ok(bytes) => bytes,
-        Err(erro) => {
-            eprintln!("erro: não foi possível ler '{caminho}': {erro}");
-            return ExitCode::from(SAIDA_ERRO_DE_USO);
+        Err(error) => {
+            eprintln!(
+                "erro: não foi possível ler '{}': {error}",
+                cli.source.display()
+            );
+            return ExitCode::from(EXIT_USAGE_ERROR);
         }
     };
 
-    println!("arquivo: {caminho} ({} bytes)", fonte.len());
+    println!("arquivo: {} ({} bytes)", cli.source.display(), source.len());
     ExitCode::SUCCESS
 }
