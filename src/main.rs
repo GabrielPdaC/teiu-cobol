@@ -10,10 +10,12 @@ use teiu_cobol::lexer::{self, TokenKind};
 use teiu_cobol::parser;
 use teiu_cobol::symbols::SymbolKind;
 
-/// Código de saída para erro de uso ou de leitura do arquivo (decisão D9).
-/// É o mesmo código que o clap usa quando os argumentos são inválidos.
+/// Código de saída para erro de uso ou de leitura do arquivo. É o mesmo
+/// código que o clap usa quando os argumentos são inválidos.
 const EXIT_USAGE_ERROR: u8 = 2;
-/// Código de saída quando o programa analisado tem erros (decisão D9).
+/// Código de saída quando o programa COBOL analisado tem erro (léxico ou
+/// de estrutura) — diferente de `EXIT_USAGE_ERROR`, que é falha da
+/// ferramenta em si, não do programa analisado.
 const EXIT_WITH_ERRORS: u8 = 1;
 
 /// Analisador léxico e sintático da seção de declarações de COBOL.
@@ -30,7 +32,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
 
     // Lido como bytes, e não como String, para que um caractere fora do ASCII
-    // vire erro léxico com número de linha em vez de falha de leitura (decisão D8).
+    // vire erro léxico com número de linha em vez de falha de leitura.
     let source: Vec<u8> = match fs::read(&cli.source) {
         Ok(bytes) => bytes,
         Err(error) => {
@@ -91,8 +93,8 @@ fn main() -> ExitCode {
     ExitCode::from(EXIT_WITH_ERRORS)
 }
 
-/// Nome do token (igual ao das variantes de `docs/especificacao.md`) e o
-/// lexema a exibir, quando houver um específico.
+/// Nome do token, para a coluna "token" da tabela impressa, e o lexema a
+/// exibir (o texto fixo do token, quando ele não guarda um lexema próprio).
 fn describe_token(kind: &TokenKind) -> (&'static str, String) {
     match kind {
         TokenKind::Data => ("Data", "DATA".into()),
@@ -110,8 +112,8 @@ fn describe_token(kind: &TokenKind) -> (&'static str, String) {
     }
 }
 
-/// Nome da categoria (igual aos tipos do enunciado: char/int/float, mais
-/// group) e a cadeia PIC a exibir, quando houver uma.
+/// Nome da categoria do item (char/int/float/group) e a cadeia PIC a
+/// exibir, quando houver uma (itens de grupo não têm PIC).
 fn describe_symbol(symbol: &teiu_cobol::symbols::Symbol) -> (&'static str, String) {
     let categoria = match symbol.kind {
         SymbolKind::Group => "group",

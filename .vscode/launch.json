@@ -1,0 +1,55 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Debug unit tests in library 'teiu_cobol'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test"
+                ]
+            }
+        },
+        {
+            "name": "Debug executable 'teiu-cobol'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "run",
+                    "--bin=teiu-cobol",
+                ]
+            },
+            "args": [
+                    ".\\exemplos\\validos\\01-cliente.cob"
+            ]
+        },
+        {
+            "name": "Debug unit tests in executable 'teiu-cobol'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--bin=teiu-cobol"
+                ]
+            }
+        },
+        {
+            "name": "Debug integration test 'exemplos'",
+            "type": "lldb",
+            "request": "launch",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--test=exemplos"
+                ]
+            }
+        }
+    ]
+}

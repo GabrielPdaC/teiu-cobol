@@ -1,5 +1,5 @@
-//! A gramática de declarações em si (seção 5 da especificação), implementada
-//! como analisador descendente recursivo (decisão D7):
+//! A gramática de declarações em si, implementada como analisador
+//! descendente recursivo — cada regra da gramática é uma função:
 //!
 //! ```text
 //! programa            = cabecalho , { entrada } ;
@@ -165,8 +165,8 @@ impl<'t> Parser<'t> {
         if let Some(Token { kind: TokenKind::UnsupportedReserved(word), line, col }) = self.peek() {
             self.error(
                 format!(
-                    "cláusula '{word}' não é suportada nesta etapa: as variáveis são apenas \
-                     declaradas, sem inicialização (decisão D5 da especificação)"
+                    "cláusula '{word}' não é suportada: as variáveis são apenas declaradas, \
+                     sem inicialização"
                 ),
                 *line,
                 *col,
@@ -208,8 +208,8 @@ impl<'t> Parser<'t> {
 
     /// Lê `[ "REDEFINES" NOME ]`. Devolve `Ok(None)` quando não há cláusula
     /// `REDEFINES` (a maioria dos itens). A validação de que o alvo existe e
-    /// vem no lugar certo (seção 6.1) fica para `redefines.rs`, porque
-    /// depende de itens que ainda não foram lidos neste ponto do arquivo.
+    /// vem no lugar certo fica para `redefines.rs`, porque depende de itens
+    /// que ainda não foram lidos neste ponto do arquivo.
     fn parse_redefines_clause(&mut self, name: &str) -> Result<Option<String>, ()> {
         if !matches!(self.peek(), Some(Token { kind: TokenKind::Redefines, .. })) {
             return Ok(None);
@@ -300,7 +300,7 @@ fn build_symbol(entry: RawEntry) -> Symbol {
     }
 }
 
-/// Descreve um token para mensagens de erro em português (seção 9).
+/// Descreve um token para mensagens de erro em português.
 fn describe(kind: &TokenKind) -> String {
     match kind {
         TokenKind::Data => "a palavra reservada 'DATA'".into(),
@@ -348,9 +348,9 @@ mod tests {
 
     #[test]
     fn value_e_erro_de_estrutura_nao_lexico() {
-        // Literais entre aspas não fazem parte do subconjunto (limitação L2);
-        // por isso o teste usa um valor numérico, para isolar o erro de
-        // estrutura que a cláusula VALUE em si já basta para gerar.
+        // Literais entre aspas não são reconhecidos por este léxico; o teste
+        // usa um valor numérico, para isolar o erro de estrutura que a
+        // cláusula VALUE em si já basta para gerar.
         let fonte = b"DATA DIVISION.\nWORKING-STORAGE SECTION.\n01 W78-NUMPRG VALUE 1.\n";
         let (_, errors) = parse_source(fonte);
         assert_eq!(errors.len(), 1);

@@ -1,39 +1,46 @@
-//! Tokens reconhecidos fora da cláusula PIC (modo NORMAL).
+//! Tokens reconhecidos fora de uma cláusula `PIC` (modo NORMAL).
+//!
+//! Cada regra tem uma prioridade: quando duas regras casam o mesmo número
+//! de caracteres, vence a de prioridade mais alta. Quando uma casa mais
+//! caracteres que a outra, vence sempre a mais longa — a prioridade só
+//! desempata.
 
 use logos::Logos;
 
-/// Tokens reconhecidos fora da cláusula PIC.
 #[derive(Logos, Debug, Clone, PartialEq, Eq)]
 #[logos(utf8 = false)]
-#[logos(skip r"[ \t\r\n]+")]
-#[logos(skip(r"\*>[^\n]*", allow_greedy = true))]
+#[logos(skip r"[ \t\r\n]+")] // espaço, tabulação, quebra de linha: ignorados
+#[logos(skip(r"\*>[^\n]*", allow_greedy = true))] // comentário: `*>` até o fim da linha
 pub enum NormalToken {
-    #[regex("DATA", priority = 4, ignore(case))]
+    #[regex("DATA", priority = 4, ignore(case))] // palavra reservada "DATA"
     Data,
 
-    #[regex("DIVISION", priority = 4, ignore(case))]
+    #[regex("DIVISION", priority = 4, ignore(case))] // palavra reservada "DIVISION"
     Division,
 
-    #[regex("WORKING-STORAGE", priority = 4, ignore(case))]
+    #[regex("WORKING-STORAGE", priority = 4, ignore(case))] // palavra reservada "WORKING-STORAGE"
     WorkingStorage,
 
-    #[regex("SECTION", priority = 4, ignore(case))]
+    #[regex("SECTION", priority = 4, ignore(case))] // palavra reservada "SECTION"
     Section,
 
-    /// Entra no modo PIC (ver `crate::lexer`).
+    /// Início de uma cláusula PIC. Ao ler este token, o léxico troca para
+    /// os tokens de `crate::token::PicToken` (ver `crate::lexer`).
     #[regex("PIC|PICTURE", priority = 4, ignore(case))]
     Pic,
 
-    #[regex("IS", priority = 4, ignore(case))]
+    #[regex("IS", priority = 4, ignore(case))] // palavra reservada opcional em "PIC IS ..."
     Is,
 
-    /// Início da cláusula `REDEFINES` (decisão D24): faz um item ocupar o
-    /// mesmo espaço de outro já declarado, em vez de um espaço novo.
+    /// Início da cláusula `REDEFINES`: o item declarado a seguir passa a
+    /// ocupar o mesmo espaço de outro item já declarado, em vez de reservar
+    /// espaço novo.
     #[regex("REDEFINES", priority = 4, ignore(case))]
     Redefines,
 
-    /// Palavras reservadas fora do escopo desta etapa (decisão D5, D18):
-    /// reconhecidas para virarem erro de estrutura, e não erro léxico.
+    /// Palavras reservadas de COBOL que este analisador reconhece mas não
+    /// implementa. `VALUE`, por exemplo, inicializa um item — aqui as
+    /// declarações não têm inicialização, então usá-la é sempre erro.
     #[regex(
         "VALUE|USAGE|OCCURS|FILLER",
         |lex| lex.slice().to_owned(),
@@ -42,13 +49,18 @@ pub enum NormalToken {
     )]
     UnsupportedReserved(Vec<u8>),
 
-    /// Nível (01-49, 77) ou número decimal em posição inválida; a faixa é
-    /// verificada pelo analisador sintático (decisão D13, D14).
+    /// Um nível (`01`, `77`) ou um número qualquer — o parser confere se o
+    /// valor é mesmo um nível válido (01-49 ou 77), porque o léxico sozinho
+    /// não sabe em que posição da declaração o número está.
+    /// Aceita: "01", "77", "3.5". Rejeita: "3." (ponto sem dígito depois),
+    /// ".5" (falta o dígito antes do ponto).
     #[regex(r"[0-9]+(\.[0-9]+)?", |lex| lex.slice().to_owned(), priority = 3)]
     Number(Vec<u8>),
 
-    /// Nome de dado. Ao contrário de C, pode começar com dígito, desde que
-    /// tenha ao menos uma letra (decisão D4, seção 4.1 da especificação).
+    /// Nome de um item de dado. Pode começar com dígito (diferente de C),
+    /// mas precisa ter ao menos uma letra em algum ponto, e não pode
+    /// começar nem terminar com hífen.
+    /// Aceita: "CONTADOR", "2A-VIA", "WS-1". Rejeita: "123", "-CONTA", "CONTA-".
     #[regex(
         r"([0-9]+-+)*[0-9]*[A-Za-z]([A-Za-z0-9-]*[A-Za-z0-9])?",
         |lex| lex.slice().to_owned(),
@@ -56,13 +68,14 @@ pub enum NormalToken {
     )]
     Name(Vec<u8>),
 
-    #[regex(r"\.", priority = 2)]
+    #[regex(r"\.", priority = 2)] // ponto final, encerra uma declaração
     Period,
 
-    /// Regra pega-tudo de erro (decisão D12): casa com qualquer palavra sem
-    /// espaços que não termine em ponto. Como tem a menor prioridade, só vence
-    /// quando casa um trecho mais longo do que qualquer token válido — ou seja,
-    /// quando a palavra inteira é inválida.
+    /// Qualquer palavra que não bateu com nenhuma regra acima — sempre um
+    /// erro léxico. Tem a prioridade mais baixa de propósito: só "vence"
+    /// quando é mais longa que qualquer token válido, o que consome a
+    /// palavra inválida inteira (ex.: "-CONTA") numa mensagem só, em vez
+    /// de um erro por caractere.
     #[regex(r"[^ \t\r\n]*[^ \t\r\n.]", |lex| lex.slice().to_owned(), priority = 1)]
     InvalidWord(Vec<u8>),
 }

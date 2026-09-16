@@ -1,17 +1,17 @@
-//! Analisador sintático: consome os tokens de `lexer.rs` e produz a tabela
-//! de símbolos (`symbols.rs`) e os erros de estrutura. Dividido em três
-//! arquivos, um por responsabilidade (seções 5 e 6 da especificação):
+//! Analisador sintático: consome os tokens de `crate::lexer` e produz a
+//! tabela de símbolos (`crate::symbols`) e os erros de estrutura. Dividido
+//! em três arquivos, um por responsabilidade:
 //!
-//! - [`grammar`] — lê a gramática de declarações (decisão D7): cabeçalho,
-//!   entrada, cláusulas `PIC` e `REDEFINES`. A pergunta que ele responde é
-//!   "os tokens estão na ordem certa?".
-//! - [`hierarchy`] — verifica quem é filho de quem, com uma pilha (seção
-//!   6). Não dá pra saber isso só pela ordem dos tokens (dois `entrada`
-//!   seguidos são sintaticamente iguais, sejam irmãos ou pai e filho), por
-//!   isso fica de fora da gramática e roda depois, num segundo passo.
-//! - [`redefines`] — verifica a regra de posição da cláusula `REDEFINES`
-//!   (seção 6.1): o alvo precisa existir, ser elementar, e a entrada
-//!   precisa vir logo depois dele (ou de outra redefinição do mesmo alvo).
+//! - [`grammar`] — lê a gramática de declarações: cabeçalho, entrada,
+//!   cláusulas `PIC` e `REDEFINES`. A pergunta que ele responde é "os
+//!   tokens estão na ordem certa?".
+//! - [`hierarchy`] — verifica quem é filho de quem, com uma pilha. Não dá
+//!   pra saber isso só pela ordem dos tokens (dois `entrada` seguidos são
+//!   sintaticamente iguais, sejam irmãos ou pai e filho), por isso fica de
+//!   fora da gramática e roda depois, num segundo passo.
+//! - [`redefines`] — verifica a regra de posição da cláusula `REDEFINES`:
+//!   o alvo precisa existir, ser elementar, e a entrada precisa vir logo
+//!   depois dele (ou de outra redefinição do mesmo alvo).
 //!
 //! As três partes compartilham o mesmo `struct Parser`, definido aqui, cada
 //! uma com o seu próprio bloco `impl Parser` no arquivo correspondente — é
@@ -26,7 +26,7 @@ mod redefines;
 use crate::lexer::Token;
 use crate::symbols::Symbol;
 
-/// Um erro de estrutura, sempre com linha e coluna (seção 9 do enunciado).
+/// Um erro de estrutura, sempre com linha e coluna.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {
     pub message: String,

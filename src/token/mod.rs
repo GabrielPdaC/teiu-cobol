@@ -1,17 +1,13 @@
-//! Tokens do analisador léxico, gerados pela crate `logos` (decisão D6 em
-//! `docs/especificacao.md`). A entrada é lida como bytes (`&[u8]`), e não como
-//! `&str`, por causa da decisão D8: um byte fora do ASCII deve virar um erro
-//! léxico com linha e coluna, em vez de impedir a leitura do arquivo.
+//! Tokens do analisador léxico, gerados pela crate `logos`. O arquivo-fonte
+//! é lido como bytes (`&[u8]`), não como `&str`, para que um byte fora do
+//! ASCII vire erro léxico em vez de impedir a leitura do arquivo inteiro.
 //!
-//! Dois arquivos, um por modo — existem dois conjuntos de tokens porque a
-//! cláusula PIC tem sua própria semântica léxica (decisão D15, "modo PIC"):
-//! a mesma palavra (`X`, `9`) é uma cadeia PIC dentro da cláusula e um token
-//! inválido fora dela. Isso é o equivalente, em `logos`, das *start
-//! conditions* do Flex — o léxico troca de [`NormalToken`] para [`PicToken`]
-//! com `Lexer::morph` ao reconhecer `Pic`, e volta ao reconhecer
-//! `PicString`, `InvalidPicString` ou `Period` (ver `crate::lexer`).
-//!
-//! Os nomes das variantes seguem a tabela 4 de `docs/especificacao.md`.
+//! Dois arquivos, um por modo do léxico: dentro de uma cláusula `PIC`, as
+//! palavras `X` e `9` são símbolos de tipo; fora dela, não significam
+//! nada. Por isso são dois `enum` de token diferentes — [`NormalToken`]
+//! para o corpo do programa, [`PicToken`] para dentro da cláusula PIC — e
+//! `crate::lexer` troca de um para o outro com `Lexer::morph` ao entrar e
+//! sair da cláusula.
 
 mod normal;
 mod pic;

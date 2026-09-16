@@ -1,5 +1,5 @@
 //! Traduz uma posição em bytes (o que o `logos` devolve em `Span::start`)
-//! para linha e coluna, ambas começando em 1 (seção 3 da especificação).
+//! para linha e coluna, ambas começando em 1.
 
 pub(super) struct LineIndex {
     /// Deslocamento em bytes de onde cada linha começa; `starts[0]` é sempre 0.

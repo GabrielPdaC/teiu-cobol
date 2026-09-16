@@ -1,12 +1,12 @@
-//! Motor do analisador léxico: conduz a troca entre os modos NORMAL e PIC
-//! (decisão D15) e traduz os tokens de `crate::token` para o tipo público
-//! [`Token`]. Dividido em três arquivos:
+//! Motor do analisador léxico: conduz a troca entre os modos NORMAL e PIC e
+//! traduz os tokens de `crate::token` para o tipo público [`Token`].
+//! Dividido em três arquivos:
 //!
 //! - este arquivo — o laço que roda o `logos` ([`lex`]) e monta a lista de
 //!   tokens, junto com os tipos públicos (`Token`, `TokenKind`, `LexError`).
 //! - [`position`] — traduz a posição em bytes que o `logos` devolve para
-//!   linha e coluna (seção 3 da especificação).
-//! - [`diagnostics`] — as mensagens de erro léxico (seção 4.6).
+//!   linha e coluna.
+//! - [`diagnostics`] — as mensagens de erro léxico.
 
 mod diagnostics;
 mod position;
@@ -18,7 +18,7 @@ use crate::token::{NormalToken, PicToken};
 use diagnostics::{diagnose_invalid_word, to_text};
 use position::LineIndex;
 
-/// Tamanho máximo de um nome, em caracteres (decisão D17, norma em D10).
+/// Tamanho máximo de um nome, em caracteres.
 const MAX_NAME_LEN: usize = 31;
 
 /// Um token já classificado, com a posição de onde começa na entrada.
@@ -47,7 +47,7 @@ pub enum TokenKind {
     PicString(String),
 }
 
-/// Um erro léxico, sempre com linha e coluna (regra do enunciado, seção 9).
+/// Um erro léxico, sempre com linha e coluna.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LexError {
     pub message: String,
@@ -72,9 +72,9 @@ pub fn lex(source: &[u8]) -> (Vec<Token>, Vec<LexError>) {
                 Some(Ok(NormalToken::Pic)) => {
                     let (line, col) = lines.locate(lexer.span().start);
                     tokens.push(Token { kind: TokenKind::Pic, line, col });
-                    // Entra no modo PIC (decisão D15): a partir daqui, só valem
-                    // as regras de `PicToken`, até a próxima `PicString`,
-                    // `Period` ou `InvalidPicString`.
+                    // Entra no modo PIC: a partir daqui, só valem as regras
+                    // de `PicToken`, até a próxima `PicString`, `Period` ou
+                    // `InvalidPicString`.
                     Mode::Pic(lexer.morph())
                 }
                 Some(Ok(token)) => {
@@ -85,7 +85,7 @@ pub fn lex(source: &[u8]) -> (Vec<Token>, Vec<LexError>) {
                 Some(Err(())) => {
                     // Não deve ocorrer: a regra pega-tudo `InvalidWord` casa
                     // com qualquer palavra sem espaços que não termine em
-                    // ponto (decisão D12). Mantido por segurança.
+                    // ponto. Mantido por segurança.
                     let (line, col) = lines.locate(lexer.span().start);
                     errors.push(LexError {
                         message: "erro léxico interno: nenhuma regra casou".into(),
@@ -97,8 +97,8 @@ pub fn lex(source: &[u8]) -> (Vec<Token>, Vec<LexError>) {
             },
             Mode::Pic(mut lexer) => match lexer.next() {
                 // O arquivo terminou dentro de uma cláusula PIC sem ponto
-                // final; a falta do ponto é um erro de estrutura, tratado
-                // pelo analisador sintático (fase F4).
+                // final; a falta do ponto é um erro de estrutura, e quem
+                // acusa isso é o parser, não o léxico.
                 None => break,
                 Some(Ok(PicToken::Is)) => {
                     let (line, col) = lines.locate(lexer.span().start);
@@ -141,8 +141,8 @@ pub fn lex(source: &[u8]) -> (Vec<Token>, Vec<LexError>) {
     (tokens, errors)
 }
 
-/// O analisador está sempre em um destes dois modos (decisão D15): NORMAL
-/// para o corpo do programa, PIC dentro de uma cláusula `PIC`/`PICTURE`.
+/// O analisador está sempre em um destes dois modos: NORMAL para o corpo
+/// do programa, PIC dentro de uma cláusula `PIC`/`PICTURE`.
 enum Mode<'s> {
     Normal(logos::Lexer<'s, NormalToken>),
     Pic(logos::Lexer<'s, PicToken>),
@@ -170,9 +170,9 @@ fn handle_normal_token(
         NormalToken::Period => TokenKind::Period,
         NormalToken::Name(bytes) => {
             let nome = to_text(&bytes);
-            // Limite de tamanho verificado aqui, e não na expressão regular
-            // (decisão D17): a regra continua casando o nome inteiro, e o
-            // erro fica com uma mensagem específica.
+            // Limite de tamanho verificado aqui, e não na expressão regular:
+            // a regra continua casando o nome inteiro, e este erro tem uma
+            // mensagem própria, mais clara do que uma regex rejeitando.
             if nome.chars().count() > MAX_NAME_LEN {
                 errors.push(LexError {
                     message: format!(
@@ -221,8 +221,6 @@ fn kinds(tokens: &[Token]) -> Vec<(&'static str, String)> {
 mod tests {
     use super::*;
 
-    // --- 4.5 Exemplos de reconhecimento (programa válido completo) ---
-
     #[test]
     fn programa_valido_completo() {
         let fonte = b"DATA DIVISION.\nWORKING-STORAGE SECTION.\n\
@@ -265,7 +263,7 @@ mod tests {
     #[test]
     fn picture_completo_nao_e_confundido_com_pic() {
         // Casamento mais longo: "PICTURE" (7) vence "PIC" (3), mesmo a
-        // reservada `Pic` tendo prioridade maior (seção 4.1).
+        // reservada `Pic` tendo prioridade maior.
         let (tokens, errors) = lex(b"PICTURE IS S9(7)V99.");
         assert!(errors.is_empty());
         assert_eq!(
@@ -290,7 +288,7 @@ mod tests {
 
     #[test]
     fn nome_pode_comecar_com_digito() {
-        // Ao contrário de C: "2CONTADOR" é um nome válido em COBOL (seção 4.1).
+        // Ao contrário de C: "2CONTADOR" é um nome válido em COBOL.
         let (tokens, errors) = lex(b"2A-VIA");
         assert!(errors.is_empty());
         assert_eq!(kinds(&tokens), vec![("Name", "2A-VIA".into())]);
@@ -337,7 +335,7 @@ mod tests {
     fn nome_com_32_caracteres_excede_o_limite() {
         let nome = "A".repeat(32);
         let (tokens, errors) = lex(nome.as_bytes());
-        // O token ainda é reconhecido como Name (decisão D17); só o erro muda.
+        // O token ainda é reconhecido como Name; só a mensagem de erro muda.
         assert_eq!(kinds(&tokens), vec![("Name", nome)]);
         assert_eq!(errors.len(), 1);
         assert!(errors[0].message.contains("excede o limite de 31 caracteres"));

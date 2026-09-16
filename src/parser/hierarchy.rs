@@ -1,8 +1,8 @@
-//! Verificação da hierarquia de níveis (seção 6 da especificação): quem é
-//! filho de quem, com uma pilha. Isto não está na gramática de `grammar.rs`
-//! porque depende de contexto — dois `entrada` seguidos são sintaticamente
-//! idênticos, sejam eles irmãos ou pai e filho — e por isso roda depois,
-//! num segundo passo, quando todos os símbolos já foram montados (D23).
+//! Verificação da hierarquia de níveis: quem é filho de quem, com uma
+//! pilha. Isto não está na gramática de `grammar.rs` porque depende de
+//! contexto — dois `entrada` seguidos são sintaticamente idênticos, sejam
+//! eles irmãos ou pai e filho — e por isso roda depois, num segundo passo,
+//! quando todos os símbolos já foram montados.
 
 use std::collections::HashMap;
 
@@ -17,7 +17,7 @@ impl<'t> Parser<'t> {
     /// do processo, chama [`Parser::check_redefines`] (definida em
     /// `redefines.rs`) — a validação de `REDEFINES` depende dos pais já
     /// estarem resolvidos. Por último, recalcula o tamanho de cada grupo,
-    /// já considerando a regra de `REDEFINES` (seção 6.1).
+    /// já considerando os itens que usam `REDEFINES`.
     pub(super) fn check_hierarchy(&mut self) {
         struct Aberto {
             level: u32,
@@ -81,9 +81,10 @@ impl<'t> Parser<'t> {
         self.check_redefines();
 
         // Recalcula o tamanho dos grupos como a soma dos filhos diretos,
-        // agora que todo pai já está resolvido (D21). Um item que redefine
-        // outro (D24) não soma espaço novo: ele já está contado dentro do
-        // item que redefine, como o maior tamanho entre os dois (D25).
+        // agora que todo pai já está resolvido. Um item que redefine outro
+        // não soma espaço novo: ele já está contado dentro do item que
+        // redefine, como o maior tamanho entre os dois (os dois dividem o
+        // mesmo espaço de memória).
         let mut maior_redefinicao: HashMap<String, usize> = HashMap::new();
         for symbol in &self.symbols {
             if let Some(base) = &symbol.redefines {
@@ -91,15 +92,15 @@ impl<'t> Parser<'t> {
                 *atual = (*atual).max(symbol.size_bytes);
             }
         }
-        // Percorre de trás para frente (decisão D26): num arquivo COBOL, um
-        // item sempre é declarado depois do grupo que o contém — inclusive
-        // um grupo aninhado dentro de outro grupo (ex.: CONTA dentro de
-        // CLIENTE). Andando de trás pra frente, ao chegar na linha de um
-        // grupo, todo filho dele já teve o tamanho resolvido nesta mesma
-        // passada, mesmo quando esse filho é ele próprio um grupo. Numa
-        // única passada para a frente, um grupo aninhado ficava de fora da
-        // soma do grupo mais externo, porque o tamanho dele só existia
-        // depois de todo o cálculo terminar.
+        // Percorre de trás para frente: num arquivo COBOL, um item sempre é
+        // declarado depois do grupo que o contém — inclusive um grupo
+        // aninhado dentro de outro grupo (ex.: CONTA dentro de CLIENTE).
+        // Andando de trás pra frente, ao chegar na linha de um grupo, todo
+        // filho dele já teve o tamanho resolvido nesta mesma passada, mesmo
+        // quando esse filho é ele próprio um grupo. Numa única passada para
+        // a frente, um grupo aninhado ficava de fora da soma do grupo mais
+        // externo, porque o tamanho dele só existia depois de todo o
+        // cálculo terminar.
         let mut tamanhos: HashMap<String, usize> = HashMap::new();
         for i in (0..self.symbols.len()).rev() {
             if matches!(self.symbols[i].kind, SymbolKind::Group) {

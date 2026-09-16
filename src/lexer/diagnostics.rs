@@ -1,9 +1,11 @@
-//! Mensagens de erro léxico (seção 4.6 da especificação): o diagnóstico da
-//! regra pega-tudo `InvalidWord` e a conversão do lexema (bytes) para texto.
+//! Mensagens de erro léxico: o diagnóstico da regra pega-tudo `InvalidWord`
+//! e a conversão do lexema (bytes) para texto.
 
 /// Diagnostica uma palavra rejeitada pela regra pega-tudo `InvalidWord`,
-/// seguindo a ordem da tabela 4.6 da especificação: caractere não permitido,
-/// depois hífen nas pontas, depois falta de letra.
+/// testando as causas nesta ordem: caractere não permitido, depois hífen
+/// nas pontas, depois falta de letra. A ordem importa porque uma mesma
+/// palavra pode cair em mais de uma causa (ex.: "-2" não tem letra e
+/// começa com hífen); só a primeira é reportada.
 pub(super) fn diagnose_invalid_word(palavra: &str) -> String {
     const PERMITIDOS: &str = "letras, dígitos e hífen";
 
@@ -21,9 +23,9 @@ pub(super) fn diagnose_invalid_word(palavra: &str) -> String {
     format!("palavra inválida '{palavra}'")
 }
 
-/// Converte o lexema (bytes) para exibição. O alfabeto da linguagem é ASCII
-/// (decisão D8); bytes fora do ASCII só aparecem aqui em casos de borda e são
-/// substituídos pelo caractere de substituição do Unicode.
+/// Converte o lexema (bytes) para exibição. O alfabeto da linguagem é ASCII;
+/// um byte fora do ASCII só chega até aqui em casos de borda, e é
+/// substituído pelo caractere de substituição do Unicode.
 pub(super) fn to_text(bytes: &[u8]) -> String {
     String::from_utf8_lossy(bytes).into_owned()
 }

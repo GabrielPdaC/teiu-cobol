@@ -1,7 +1,7 @@
-//! Tabela de símbolos e leitura de cadeias PIC (seção 7 da especificação).
+//! Tabela de símbolos e leitura de cadeias PIC.
 
 /// Uma entrada da tabela de símbolos: um item declarado, já com o tamanho em
-/// bytes calculado e o nome do pai na hierarquia (seção 6 da especificação).
+/// bytes calculado e o nome do pai na hierarquia de níveis.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Symbol {
     pub name: String,
@@ -11,13 +11,14 @@ pub struct Symbol {
     pub pic: Option<String>,
     pub size_bytes: usize,
     pub parent: Option<String>,
-    /// Nome do item que este redefine (cláusula `REDEFINES`, decisão D24), ou
-    /// nenhum se o item ocupa espaço próprio.
+    /// Nome do item que este redefine (cláusula `REDEFINES`), ou nenhum se
+    /// o item ocupa espaço próprio.
     pub redefines: Option<String>,
     pub line: usize,
 }
 
-/// Categoria do item, já traduzida para os três tipos do enunciado (seção 1).
+/// Categoria do item: os três tipos que a linguagem reconhece, mais o item
+/// de grupo (que não guarda dado nenhum, só agrupa outros itens).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymbolKind {
     /// Item de grupo (sem PIC): o análogo da lista `int a, b, c;`.
@@ -31,9 +32,9 @@ pub enum SymbolKind {
 }
 
 impl SymbolKind {
-    /// Tamanho em bytes de um item elementar (D21: um byte por posição da
-    /// cadeia PIC, sem representar aqui o byte extra que o sinal ocupa em
-    /// formatos empacotados — está fora do escopo, seção 10, limitação L6).
+    /// Tamanho em bytes de um item elementar: um byte por posição da cadeia
+    /// PIC. Não representa o byte extra que o sinal ocupa em formatos
+    /// binários/empacotados — fora do escopo deste analisador.
     pub fn size_bytes(self) -> usize {
         match self {
             SymbolKind::Group => 0,
@@ -45,9 +46,8 @@ impl SymbolKind {
 }
 
 /// Lê uma cadeia PIC já validada pelo léxico (nunca `InvalidPicString`) e
-/// devolve a categoria correspondente. Implementa a leitura descrita na
-/// seção 4.3 da especificação: se tem `X`, é `char`; senão é numérico, com
-/// `V` separando a parte inteira da fracionária.
+/// devolve a categoria correspondente: se tem `X`, é `char`; senão é
+/// numérico, com `V` separando a parte inteira da fracionária.
 pub fn analyze_pic(pic: &str) -> SymbolKind {
     let upper = pic.to_ascii_uppercase();
     if upper.contains('X') {

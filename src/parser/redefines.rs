@@ -1,10 +1,9 @@
-//! Verificação da cláusula `REDEFINES` (seção 6.1 da especificação,
-//! decisão D24): o alvo precisa existir, ser elementar (ter PIC), estar no
-//! mesmo nível, e a entrada precisa vir logo depois do alvo — ou logo
-//! depois de *outra* entrada que já redefina o mesmo alvo. É essa segunda
-//! parte que permite `CPF` e `CNPJ` redefinirem os dois o mesmo
-//! `CPF-CNPJ`, um depois do outro. Chamada por `hierarchy.rs`, depois que
-//! os pais de cada item já foram resolvidos.
+//! Verificação da cláusula `REDEFINES`: o alvo precisa existir, ser
+//! elementar (ter PIC), estar no mesmo nível, e a entrada precisa vir logo
+//! depois do alvo — ou logo depois de *outra* entrada que já redefina o
+//! mesmo alvo. É essa segunda parte que permite `CPF` e `CNPJ` redefinirem
+//! os dois o mesmo `CPF-CNPJ`, um depois do outro. Chamada por
+//! `hierarchy.rs`, depois que os pais de cada item já foram resolvidos.
 
 use super::{ParseError, Parser};
 
