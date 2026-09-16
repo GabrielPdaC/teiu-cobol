@@ -24,8 +24,9 @@ struct Caso {
 const CASOS: &[Caso] = &[
     Caso {
         arquivo: "exemplos/validos/01-cliente.cob",
-        // 77 CONTADOR, 01 CLIENTE, 05 CNPJ, 05 CPF, 05 NOME, 05 SALDO.
-        esperado: Esperado::Valido { simbolos: 6 },
+        // 77 CONTADOR, 01 CLIENTE, 05 CNPJ, 05 CPF, 05 NOME, 05 CONTA
+        // (grupo aninhado), 10 SALDO, 10 LIMITE.
+        esperado: Esperado::Valido { simbolos: 8 },
     },
     Caso {
         arquivo: "exemplos/validos/02-cpf-cnpj-redefines.cob",

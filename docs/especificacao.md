@@ -30,11 +30,17 @@ WORKING-STORAGE SECTION.
 77 CONTADOR       PIC S9(4).
 01 CLIENTE.
    05 NOME        PIC X(30).
-   05 SALDO       PIC S9(7)V99.
    05 CPF-CNPJ    PIC X(14).
    05 CPF         REDEFINES CPF-CNPJ PIC 9(11).
    05 CNPJ        REDEFINES CPF-CNPJ PIC 9(14).
+   05 CONTA.
+      10 SALDO    PIC S9(7)V99.
+      10 LIMITE   PIC S9(7)V99.
 ```
+
+`CONTA` é um grupo dentro do grupo `CLIENTE` — um nível a mais de
+aninhamento, suportado pela mesma pilha de hierarquia (seção 6), sem
+nenhuma regra nova.
 
 `REDEFINES` foi acrescentado ao escopo por pedido do usuário, para um caso de
 uso real do trabalho (documento CPF ou CNPJ no mesmo campo) — é a única
@@ -382,6 +388,7 @@ depois dele continuam sendo verificadas normalmente.
 | D23 | A hierarquia de níveis (seção 6) é verificada num segundo passo, depois que `src/parser.rs` já montou todos os símbolos, e não durante a leitura de cada `entrada` | O tamanho de um grupo depende dos filhos, que só se sabe todos depois de ler o programa inteiro; fazer isso num segundo passo, com uma pilha, evita calcular o tamanho de um grupo antes de conhecer todos os seus membros. |
 | D24 | `REDEFINES` entra no escopo (seção 6.1), restrito a itens elementares (com PIC) de ambos os lados; a entrada precisa vir logo depois do alvo ou de outra redefinição do mesmo alvo | Pedido do usuário, para um caso de uso real (documento CPF/CNPJ no mesmo campo). É a única cláusula fora da correspondência com a linguagem estilo C do enunciado. A restrição a elementares evita a complexidade de um grupo redefinir outro grupo (recalcular o tamanho de uma subárvore inteira), que fica como trabalho futuro (L9). A regra de adjacência (D22, no sentido de manter a leitura simples) é a mesma que a maioria dos compiladores COBOL exige. |
 | D25 | O tamanho de um grupo conta um item redefinido **uma vez só**, como o maior tamanho entre ele e todas as suas redefinições | `REDEFINES` significa que os itens dividem o mesmo espaço de memória, e não que cada um tem o seu; somar os dois contaria espaço em dobro. |
+| D26 | O tamanho dos grupos (D21) é calculado percorrendo os símbolos de trás para frente, e não com uma soma só | Corrige um bug: a soma original ignorava um filho que fosse, ele mesmo, um grupo — um grupo aninhado (`05 CONTA.` com `10 SALDO`/`10 LIMITE` dentro, subordinado a `01 CLIENTE`) nunca entrava na soma do grupo de fora. De trás para frente funciona porque, num arquivo COBOL, um item sempre é declarado depois do grupo que o contém — ao chegar na linha do grupo de fora, o grupo de dentro já teve o tamanho resolvido nesta mesma passada. Encontrado só depois que um exemplo de teste passou a ter dois níveis de grupo (seção 6). |
 
 ## 10. Limitações conhecidas
 

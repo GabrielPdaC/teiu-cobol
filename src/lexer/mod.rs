@@ -1,11 +1,22 @@
-//! Motor do analisador léxico: localiza linha e coluna, conduz a troca entre
-//! os modos NORMAL e PIC (decisão D15) e traduz os tokens de `token.rs` para
-//! o tipo público `Token`, junto com as mensagens de erro léxico (seção 4.6
-//! da especificação).
+//! Motor do analisador léxico: conduz a troca entre os modos NORMAL e PIC
+//! (decisão D15) e traduz os tokens de `crate::token` para o tipo público
+//! [`Token`]. Dividido em três arquivos:
+//!
+//! - este arquivo — o laço que roda o `logos` ([`lex`]) e monta a lista de
+//!   tokens, junto com os tipos públicos (`Token`, `TokenKind`, `LexError`).
+//! - [`position`] — traduz a posição em bytes que o `logos` devolve para
+//!   linha e coluna (seção 3 da especificação).
+//! - [`diagnostics`] — as mensagens de erro léxico (seção 4.6).
+
+mod diagnostics;
+mod position;
 
 use logos::Logos;
 
 use crate::token::{NormalToken, PicToken};
+
+use diagnostics::{diagnose_invalid_word, to_text};
+use position::LineIndex;
 
 /// Tamanho máximo de um nome, em caracteres (decisão D17, norma em D10).
 const MAX_NAME_LEN: usize = 31;
@@ -46,8 +57,8 @@ pub struct LexError {
 
 /// Analisa `source` e devolve os tokens reconhecidos e os erros léxicos
 /// encontrados. Continua após cada erro, para relatar todos de uma vez
-/// (recuperação simples: a regra pega-tudo do token.rs já consome a palavra
-/// inválida inteira, então a próxima iteração começa limpa).
+/// (recuperação simples: a regra pega-tudo de `crate::token` já consome a
+/// palavra inválida inteira, então a próxima iteração começa limpa).
 pub fn lex(source: &[u8]) -> (Vec<Token>, Vec<LexError>) {
     let lines = LineIndex::new(source);
     let mut tokens = Vec::new();
@@ -182,81 +193,33 @@ fn handle_normal_token(
     tokens.push(Token { kind, line, col });
 }
 
-/// Diagnostica uma palavra rejeitada pela regra pega-tudo `InvalidWord`,
-/// seguindo a ordem da tabela 4.6 da especificação: caractere não permitido,
-/// depois hífen nas pontas, depois falta de letra.
-fn diagnose_invalid_word(palavra: &str) -> String {
-    const PERMITIDOS: &str = "letras, dígitos e hífen";
-
-    if let Some(c) = palavra.chars().find(|c| !(c.is_ascii_alphanumeric() || *c == '-')) {
-        return format!(
-            "palavra inválida '{palavra}': caractere '{c}' não permitido (esperado {PERMITIDOS})"
-        );
-    }
-    if palavra.starts_with('-') || palavra.ends_with('-') {
-        return format!("palavra inválida '{palavra}': nome não pode começar nem terminar com hífen");
-    }
-    if !palavra.chars().any(|c| c.is_ascii_alphabetic()) {
-        return format!("palavra inválida '{palavra}': nome precisa de pelo menos uma letra");
-    }
-    format!("palavra inválida '{palavra}'")
-}
-
-/// Converte o lexema (bytes) para exibição. O alfabeto da linguagem é ASCII
-/// (decisão D8); bytes fora do ASCII só aparecem aqui em casos de borda e são
-/// substituídos pelo caractere de substituição do Unicode.
-fn to_text(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).into_owned()
-}
-
-/// Traduz uma posição em bytes (`Span::start` do `logos`) para linha e coluna,
-/// ambas começando em 1 (seção 3 da especificação).
-struct LineIndex {
-    /// Deslocamento em bytes de onde cada linha começa; `starts[0]` é sempre 0.
-    starts: Vec<usize>,
-}
-
-impl LineIndex {
-    fn new(source: &[u8]) -> Self {
-        let mut starts = vec![0];
-        starts.extend(source.iter().enumerate().filter(|&(_, &b)| b == b'\n').map(|(i, _)| i + 1));
-        LineIndex { starts }
-    }
-
-    fn locate(&self, offset: usize) -> (usize, usize) {
-        let line_index = match self.starts.binary_search(&offset) {
-            Ok(i) => i,
-            Err(i) => i - 1,
-        };
-        (line_index + 1, offset - self.starts[line_index] + 1)
-    }
+/// Reduz a lista de tokens a pares (nome do token, lexema), para comparar
+/// com o esperado sem repetir a posição em cada caso de teste. Usada pelos
+/// testes deste arquivo e de `diagnostics.rs`.
+#[cfg(test)]
+fn kinds(tokens: &[Token]) -> Vec<(&'static str, String)> {
+    tokens
+        .iter()
+        .map(|t| match &t.kind {
+            TokenKind::Data => ("Data", String::new()),
+            TokenKind::Division => ("Division", String::new()),
+            TokenKind::WorkingStorage => ("WorkingStorage", String::new()),
+            TokenKind::Section => ("Section", String::new()),
+            TokenKind::Pic => ("Pic", String::new()),
+            TokenKind::Is => ("Is", String::new()),
+            TokenKind::Redefines => ("Redefines", String::new()),
+            TokenKind::UnsupportedReserved(s) => ("UnsupportedReserved", s.clone()),
+            TokenKind::Number(s) => ("Number", s.clone()),
+            TokenKind::Name(s) => ("Name", s.clone()),
+            TokenKind::Period => ("Period", String::new()),
+            TokenKind::PicString(s) => ("PicString", s.clone()),
+        })
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Reduz a lista de tokens a pares (nome do token, lexema), para comparar
-    /// com o esperado sem repetir a posição em cada caso de teste.
-    fn kinds(tokens: &[Token]) -> Vec<(&'static str, String)> {
-        tokens
-            .iter()
-            .map(|t| match &t.kind {
-                TokenKind::Data => ("Data", String::new()),
-                TokenKind::Division => ("Division", String::new()),
-                TokenKind::WorkingStorage => ("WorkingStorage", String::new()),
-                TokenKind::Section => ("Section", String::new()),
-                TokenKind::Pic => ("Pic", String::new()),
-                TokenKind::Is => ("Is", String::new()),
-                TokenKind::Redefines => ("Redefines", String::new()),
-                TokenKind::UnsupportedReserved(s) => ("UnsupportedReserved", s.clone()),
-                TokenKind::Number(s) => ("Number", s.clone()),
-                TokenKind::Name(s) => ("Name", s.clone()),
-                TokenKind::Period => ("Period", String::new()),
-                TokenKind::PicString(s) => ("PicString", s.clone()),
-            })
-            .collect()
-    }
 
     // --- 4.5 Exemplos de reconhecimento (programa válido completo) ---
 
@@ -362,36 +325,6 @@ mod tests {
         assert_eq!((tokens[0].line, tokens[0].col), (2, 1));
     }
 
-    // --- 4.6 Erros léxicos ---
-
-    #[test]
-    fn nome_nao_pode_comecar_com_hifen() {
-        let (_, errors) = lex(b"-CONTA");
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].message.contains("não pode começar nem terminar com hífen"));
-    }
-
-    #[test]
-    fn nome_nao_pode_terminar_com_hifen() {
-        let (_, errors) = lex(b"CONTA-.");
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].message.contains("não pode começar nem terminar com hífen"));
-    }
-
-    #[test]
-    fn caractere_nao_permitido_e_relatado() {
-        let (_, errors) = lex(b"CONTA@X.");
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].message.contains("caractere '@' não permitido"), "{:?}", errors[0]);
-    }
-
-    #[test]
-    fn palavra_sem_letra_precisa_de_pelo_menos_uma() {
-        let (_, errors) = lex(b"1-2");
-        assert_eq!(errors.len(), 1);
-        assert!(errors[0].message.contains("pelo menos uma letra"));
-    }
-
     #[test]
     fn nome_no_limite_de_31_caracteres_e_aceito() {
         let nome = "A".repeat(31);
@@ -435,16 +368,5 @@ mod tests {
             kinds(&tokens),
             vec![("Pic", "".into()), ("PicString", "X".into()), ("Name", "NOME".into())]
         );
-    }
-
-    // --- linha e coluna ---
-
-    #[test]
-    fn linha_e_coluna_em_fonte_com_varias_linhas() {
-        let fonte = b"DATA DIVISION.\n01 CLIENTE.\n   05 NOME PIC X.\n";
-        let (tokens, _) = lex(fonte);
-        // "05" está na linha 3, coluna 4 (após três espaços).
-        let numero_05 = tokens.iter().find(|t| matches!(&t.kind, TokenKind::Number(n) if n == "05"));
-        assert_eq!(numero_05.map(|t| (t.line, t.col)), Some((3, 4)));
     }
 }

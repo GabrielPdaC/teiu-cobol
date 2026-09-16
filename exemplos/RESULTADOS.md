@@ -15,23 +15,39 @@ A tabela de tokens é omitida abaixo (fica completa ao rodar
 ### `validos/01-cliente.cob`
 
 Reúne, num só programa, quase todo o escopo: um `77` isolado, um grupo
-(`01`) com filhos, e dentro dele uma cláusula `REDEFINES` (`CPF`
-redefinindo `CNPJ`). Roda sem erro, código `0`.
+(`01`) com filhos, dentro dele uma cláusula `REDEFINES` (`CPF` redefinindo
+`CNPJ`), **e um grupo aninhado dentro do grupo** (`CONTA`, com `SALDO` e
+`LIMITE` por dentro). Roda sem erro, código `0`.
 
 ```
 linha  nível nome        categoria  pic          bytes  pai      redefines
 4      77    CONTADOR    int        S9(4)        4      -        -
-5      1     CLIENTE     group      -            53     -        -
+5      1     CLIENTE     group      -            62     -        -
 6      5     CNPJ        int        9(14)        14     CLIENTE  -
 7      5     CPF         int        9(11)        11     CLIENTE  CNPJ
 8      5     NOME        char       X(30)        30     CLIENTE  -
-9      5     SALDO       float      S9(7)V99     9      CLIENTE  -
+9      5     CONTA       group      -            18     CLIENTE  -
+10     10    SALDO       float      S9(7)V99     9      CONTA    -
+11     10    LIMITE      float      S9(7)V99     9      CONTA    -
 ```
 
-`CLIENTE` fica com 53 bytes: 14 (o maior entre `CNPJ` e `CPF`, que dividem
-o mesmo espaço — seção 6.1) + 30 (`NOME`) + 9 (`SALDO`). Sem `REDEFINES`
-teria sido 14+11+30+9 = 64; a diferença de 11 bytes é exatamente o espaço
-que `CPF` deixou de duplicar.
+`CLIENTE` fica com 62 bytes: 14 (o maior entre `CNPJ` e `CPF`, que dividem
+o mesmo espaço — seção 6.1) + 30 (`NOME`) + 18 (`CONTA`, o grupo aninhado,
+que por sua vez é 9 de `SALDO` + 9 de `LIMITE`). Sem `REDEFINES` teria sido
+14+11+30+18 = 73; a diferença de 11 bytes é exatamente o espaço que `CPF`
+deixou de duplicar.
+
+**Achado durante os testes manuais:** a primeira versão do cálculo de
+tamanho excluía qualquer item que fosse, ele mesmo, um grupo — então
+`CONTA` nunca entrava na soma de `CLIENTE` (dava 44, não 62). O bug só
+apareceu porque este exemplo foi editado para ter um grupo dentro de
+grupo; os testes automatizados até então só cobriam um nível de
+aninhamento. Corrigido percorrendo os símbolos de trás para frente
+(decisão D26): como um item é sempre declarado depois do grupo que o
+contém, ao chegar na linha do grupo de fora, o grupo de dentro já teve o
+tamanho resolvido. Ganhou um teste de regressão dedicado
+(`grupo_aninhado_conta_no_tamanho_do_grupo_de_fora`, em
+`src/parser/hierarchy.rs`).
 
 ### `validos/02-cpf-cnpj-redefines.cob`
 
